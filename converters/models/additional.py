@@ -1,5 +1,6 @@
 import hashlib
 from dataclasses import dataclass
+from html_sanitizer import Sanitizer
 import re
 
 
@@ -11,6 +12,7 @@ class AdditionalFields:
     reason: str | None = None
     secret: str | None = None
     file_key: str | None = None
+    sanitizer = Sanitizer()
 
     def __parse_url(self) -> None:
         if not self.url and "URL:" in self.description:
@@ -22,8 +24,10 @@ class AdditionalFields:
         if hasattr(self, "unsaved_endpoints") and isinstance(self.unsaved_endpoints, list):
             self.ruleId = self.title
             return
-        if "Rule Id" in self.description:
-            self.ruleId = self.description.split("**Rule Id:** ")[1].split("\n")[0]
+        if "**Rule Id**" in self.description:
+            self.ruleId = self.__sanitize(self.description.split("**Rule Id:** ")[1].split("\n")[0])
+        elif "Rule Id:" in self.description:
+            self.ruleId = self.__sanitize(self.description.split("Rule Id:")[1].split("\n")[0])
         elif self.vuln_id_from_tool:
             if not self.ruleId:
                 self.ruleId = self.vuln_id_from_tool
@@ -103,6 +107,9 @@ class AdditionalFields:
             self.rule_description = self.reason if self.reason else "Unknown"
             if self.reason and self.references:
                 self.rule_description += '\n' + self.references
+
+    def __sanitize(self, dirty: str) -> str:
+        return self.sanitizer.sanitize(dirty).strip('"`,;{}()%*[]^:/\\@~\'').strip()
 
     def parse_additional_fields(self) -> None:
         self.__parse_url()
